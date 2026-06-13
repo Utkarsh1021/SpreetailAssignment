@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  groupMembers  GroupMember[]
+  groupsCreated Group[]     @relation("GroupCreator")
+}
+
+model Group {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  baseCurrency String   @default("INR")
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  createdBy      User            @relation("GroupCreator", fields: [createdById], references: [id])
+  members        GroupMember[]
+  expenses       Expense[]
+  settlements    Settlement[]
+  importSessions ImportSession[]
+}
+
+model GroupMember {
+  id          String    @id @default(cuid())
+  groupId     String
+  userId      String?
+  displayName String
+  joinedAt    DateTime
+  leftAt      DateTime?
+
+  group           Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user            User?          @relation(fields: [userId], references: [id])
+  expensesPaid    Expense[]      @relation("ExpensePayer")
+  expenseSplits   ExpenseSplit[]
+  settlementsFrom Settlement[]   @relation("SettlementFrom")
+  settlementsTo   Settlement[]   @relation("SettlementTo")
+
+  @@unique([groupId, displayName])
+  @@index([groupId])
+}
+
+model Expense {
+  id              String   @id @default(cuid())
+  groupId         String
+  date            DateTime
+  description     String
+  paidByMemberId  String?
+  amountOriginal  Float
+  currency        String   @default("INR")
+  amountInINR     Float
+  exchangeRate    Float?
+  splitType       String   @default("equal")
+  notes           String?
+  status          String   @default("active")
+  importRowNumber Int?
+  importSessionId String?
+  createdAt       DateTime @default(now())
+
+  group         Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  paidBy        GroupMember?   @relation("ExpensePayer", fields: [paidByMemberId], references: [id])
+  importSession ImportSession? @relation(fields: [importSessionId], references: [id])
+  splits        ExpenseSplit[]
+
+  @@index([groupId, date])
+}
+
+model ExpenseSplit {
+  id          String @id @default(cuid())
+  expenseId   String
+  memberId    String
+  shareAmount Float
+  shareValue  Float?
+
+  expense Expense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  member  GroupMember @relation(fields: [memberId], references: [id])
+
+  @@unique([expenseId, memberId])
+}
+
+model Settlement {
+  id              String   @id @default(cuid())
+  groupId         String
+  fromMemberId    String
+  toMemberId      String
+  amount          Float
+  date            DateTime
+  notes           String?
+  importRowNumber Int?
+  createdAt       DateTime @default(now())
+
+  group      Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  fromMember GroupMember @relation("SettlementFrom", fields: [fromMemberId], references: [id])
+  toMember   GroupMember @relation("SettlementTo", fields: [toMemberId], references: [id])
+
+  @@index([groupId])
+}
+
+model ImportSession {
+  id        String   @id @default(cuid())
+  groupId   String
+  filename  String
+  status    String   @default("processing")
+  summary   String?
+  createdAt DateTime @default(now())
+
+  group     Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  anomalies ImportAnomaly[]
+  expenses  Expense[]
+}
+
+model ImportAnomaly {
+  id               String    @id @default(cuid())
+  importSessionId  String
+  rowNumber        Int
+  anomalyType      String
+  description      String
+  action           String
+  actionDetail     String?
+  rawRow           String
+  requiresApproval Boolean   @default(false)
+  approved         Boolean?
+  approvedAt       DateTime?
+  relatedExpenseId String?
+
+  importSession ImportSession @relation(fields: [importSessionId], references: [id], onDelete: Cascade)
+
+  @@index([importSessionId])
+}
