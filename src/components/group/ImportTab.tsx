@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download, FileText, Eye } from "lucide-react";
 
 interface Anomaly {
   id: string;
@@ -77,6 +78,33 @@ export function ImportTab({ groupId }: { groupId: string }) {
     load();
   }
 
+  function downloadAnomalyReport(session: ImportSession) {
+    const headers = ["Row", "Anomaly Type", "Description", "Action", "Detail", "Status"];
+    const rows = session.anomalies.map(a => [
+      a.rowNumber,
+      a.anomalyType,
+      `"${a.description.replace(/"/g, '""')}"`,
+      a.action,
+      `"${(a.actionDetail || "").replace(/"/g, '""')}"`,
+      a.approved === true ? "Approved" : a.approved === false ? "Rejected" : "Pending"
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => r.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `anomaly_report_${session.filename || "import"}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   const actionColor: Record<string, string> = {
     auto_fixed: "bg-blue-100 text-blue-800",
     converted: "bg-purple-100 text-purple-800",
@@ -107,7 +135,19 @@ export function ImportTab({ groupId }: { groupId: string }) {
 
       {(report || sessions[0]) && (
         <section className="rounded-lg border bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold">Import report</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-slate-400" />
+              <h2 className="text-lg font-semibold">Import report</h2>
+            </div>
+            <button
+              onClick={() => downloadAnomalyReport(report || sessions[0])}
+              className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download Anomaly Report
+            </button>
+          </div>
           {(() => {
             const s = report || sessions[0];
             const summary = typeof s.summary === "string"
@@ -130,7 +170,7 @@ export function ImportTab({ groupId }: { groupId: string }) {
                   {s.anomalies.map((a) => (
                     <div key={a.id} className="rounded-md border p-3 text-sm">
                       <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <div className="flex-1">
                           <span className="font-mono text-xs text-gray-500">
                             Row {a.rowNumber}
                           </span>
@@ -179,13 +219,38 @@ export function ImportTab({ groupId }: { groupId: string }) {
       )}
 
       {sessions.length > 1 && (
-        <section>
-          <h3 className="mb-2 font-medium">Previous imports</h3>
-          <div className="space-y-1 text-sm text-gray-600">
+        <section className="rounded-lg border bg-white p-6">
+          <h3 className="mb-4 font-semibold text-slate-900">Previous imports</h3>
+          <div className="space-y-3">
             {sessions.slice(1).map((s) => (
-              <p key={s.id}>
-                {s.filename} — {new Date(s.createdAt).toLocaleString()} ({s.status})
-              </p>
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3 text-sm">
+                  <FileText className="h-4 w-4 text-slate-400" />
+                  <span className="font-medium text-slate-700">{s.filename}</span>
+                  <span className="text-slate-400">— {new Date(s.createdAt).toLocaleString()}</span>
+                  <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    s.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {s.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setReport(s)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 hover:text-brand-600 transition-colors"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View
+                  </button>
+                  <button
+                    onClick={() => downloadAnomalyReport(s)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 hover:text-brand-600 transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Report
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </section>
