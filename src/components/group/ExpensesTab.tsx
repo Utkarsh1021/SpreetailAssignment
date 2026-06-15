@@ -221,7 +221,7 @@ export function ExpensesTab({
             </div>
             <h3 className="font-semibold text-slate-900">No expenses yet</h3>
             <p className="text-sm text-slate-500 max-w-xs mx-auto">
-              Start by adding the first expense to track your group's spending.
+              Start by adding the first expense to track your group&apos;s spending.
             </p>
           </div>
         ) : (
